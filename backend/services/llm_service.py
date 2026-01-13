@@ -1,4 +1,4 @@
-from emergentintegrations import LlmChat
+from emergentintegrations.llm.chat import LlmChat
 import os
 from typing import List, Dict, Any
 
