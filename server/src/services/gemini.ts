@@ -1,4 +1,8 @@
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import dotenv from 'dotenv';
+
+// Load env variables first
+dotenv.config();
 
 let genAI: GoogleGenerativeAI | null = null;
 let model: GenerativeModel | null = null;
@@ -7,17 +11,23 @@ let embeddingModel: GenerativeModel | null = null;
 const initializeGemini = () => {
   const apiKey = process.env.GEMINI_API_KEY;
 
+  console.log('🔑 Checking Gemini API key:', apiKey ? 'Found' : 'Not found');
+
   if (!apiKey) {
     console.warn('⚠️ GEMINI_API_KEY not set. AI features will be limited.');
     return false;
   }
 
-  genAI = new GoogleGenerativeAI(apiKey);
-  model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-  embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' });
-
-  console.log('✅ Gemini AI initialized');
-  return true;
+  try {
+    genAI = new GoogleGenerativeAI(apiKey);
+    model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+    console.log('✅ Gemini AI initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to initialize Gemini:', error);
+    return false;
+  }
 };
 
 // Initialize on module load
