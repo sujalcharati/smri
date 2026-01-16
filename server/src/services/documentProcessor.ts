@@ -43,11 +43,25 @@ export const chunkText = (text: string): IDocumentChunk[] => {
 
 export const extractTextFromPDF = async (buffer: Buffer): Promise<string> => {
   try {
-    const data = await pdf(buffer);
-    return data.text;
+    console.log(`📖 Extracting PDF, buffer size: ${buffer.length} bytes`);
+    // Limit PDF size to prevent memory issues
+    if (buffer.length > 5 * 1024 * 1024) {
+      throw new Error('PDF too large (max 5MB for processing)');
+    }
+    const data = await pdf(buffer, {
+      // Limit page count for memory efficiency
+      max: 50,
+    });
+    const text = data.text || '';
+    console.log(`📖 PDF extracted, text length: ${text.length} chars, pages: ${data.numpages}`);
+    if (!text || text.trim().length === 0) {
+      throw new Error('PDF appears to be empty or image-based (no extractable text)');
+    }
+    // Limit text length to prevent memory issues
+    return text.length > 100000 ? text.substring(0, 100000) : text;
   } catch (error) {
-    console.error('PDF extraction error:', error);
-    throw new Error('Failed to extract text from PDF');
+    console.error('❌ PDF extraction error:', error);
+    throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
 
@@ -97,40 +111,38 @@ export const processDocument = async (
       throw new Error('Unsupported content type');
     }
 
-    // Store full content
-    document.content = textContent;
+    console.log(`📄 Extracted ${textContent.length} characters from ${document.title}`);
 
-    // Create chunks
-    const chunks = chunkText(textContent);
+    // Store content (limit to 100KB to prevent memory issues)
+    const maxContentLength = 100000;
+    document.content = textContent.length > maxContentLength
+      ? textContent.substring(0, maxContentLength)
+      : textContent;
 
-    // Generate embeddings for chunks (if Gemini is configured)
-    try {
-      for (const chunk of chunks) {
-        chunk.embedding = await generateEmbedding(chunk.content);
-      }
-    } catch (error) {
-      console.warn('Embedding generation skipped:', error);
+    // Create simple chunks without overlap for memory efficiency
+    const simpleChunks: IDocumentChunk[] = [];
+    const chunkSize = 1000;
+    for (let i = 0; i < Math.min(textContent.length, maxContentLength); i += chunkSize) {
+      simpleChunks.push({
+        content: textContent.substring(i, Math.min(i + chunkSize, textContent.length)).trim(),
+        metadata: { startIndex: i, endIndex: Math.min(i + chunkSize, textContent.length) },
+      });
     }
+    document.chunks = simpleChunks;
+    console.log(`📦 Created ${simpleChunks.length} chunks`);
 
-    document.chunks = chunks;
+    // Simple summary from first 500 chars
+    document.summary = textContent.substring(0, 500).trim() + (textContent.length > 500 ? '...' : '');
+    console.log('📝 Created text summary');
 
-    // Generate summary
-    try {
-      document.summary = await summarizeDocument(textContent, document.title);
-    } catch (error) {
-      console.warn('Summary generation skipped:', error);
-    }
-
-    // Extract entities
-    try {
-      document.entities = await extractEntities(textContent);
-    } catch (error) {
-      console.warn('Entity extraction skipped:', error);
-    }
+    // No entities for now
+    document.entities = [];
 
     // Mark as completed
     document.processingStatus = 'completed';
+    console.log('💾 Saving document...');
     await document.save();
+    console.log('✅ Document saved successfully');
 
     console.log(`✅ Document processed: ${document.title}`);
   } catch (error) {
