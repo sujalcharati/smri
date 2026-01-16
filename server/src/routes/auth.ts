@@ -94,7 +94,8 @@ router.post('/login', async (req, res: Response) => {
     }
 
     // Get user's workspaces
-    const workspaces = await Workspace.find({ 'members.userId': user._id }).select('_id name');
+    const workspaceDocs = await Workspace.find({ 'members.userId': user._id }).select('_id name');
+    const workspaces = workspaceDocs.map(w => ({ id: w._id.toString(), name: w.name }));
 
     // Generate token
     const token = generateToken(user._id.toString());
@@ -121,7 +122,7 @@ router.post('/login', async (req, res: Response) => {
 });
 
 // Google OAuth - Get auth URL
-router.get('/google', (req, res: Response) => {
+router.get('/google', (_req, res: Response) => {
   const oauth2Client = createOAuth2Client();
   const authUrl = getAuthUrl(oauth2Client);
   res.json({ authUrl });
@@ -183,10 +184,12 @@ router.get('/google/callback', async (req, res: Response) => {
       await user.save();
     } else {
       // Update tokens
-      user.googleId = googleUser.id;
-      user.googleAccessToken = tokens.access_token;
+      if (typeof googleUser.id === 'string') {
+        user.googleId = googleUser.id;
+      }
+      user.googleAccessToken = tokens.access_token || undefined;
       if (tokens.refresh_token) {
-        user.googleRefreshToken = tokens.refresh_token;
+        user.googleRefreshToken = tokens.refresh_token || undefined;
       }
       if (!user.avatar && googleUser.picture) {
         user.avatar = googleUser.picture;
@@ -209,7 +212,8 @@ router.get('/google/callback', async (req, res: Response) => {
 router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
-    const workspaces = await Workspace.find({ 'members.userId': user._id }).select('_id name');
+    const workspaceDocs = await Workspace.find({ 'members.userId': user._id }).select('_id name');
+    const workspaces = workspaceDocs.map(w => ({ id: w._id.toString(), name: w.name }));
 
     res.json({
       user: {
