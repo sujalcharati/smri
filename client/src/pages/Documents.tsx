@@ -10,12 +10,13 @@ import {
   Check,
   Cloud,
   HardDrive,
-  X,
   Loader2,
+  MessageSquare,
+  Hash,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -29,8 +30,16 @@ import { useAuthStore } from '@/stores/authStore'
 import { useToast } from '@/components/ui/use-toast'
 import { cn, formatBytes, formatRelativeTime } from '@/lib/utils'
 
+interface SlackChannel {
+  id: string
+  name: string
+  memberCount?: number
+  topic?: string
+  purpose?: string
+}
+
 export default function Documents() {
-  const { currentWorkspace, user } = useAuthStore()
+  const { currentWorkspace, user, token } = useAuthStore()
   const {
     documents,
     driveFiles,
@@ -51,10 +60,17 @@ export default function Documents() {
   const [selectedDriveFiles, setSelectedDriveFiles] = useState<string[]>([])
   const [isDragging, setIsDragging] = useState(false)
 
+  // Slack state
+  const [slackConfigured, setSlackConfigured] = useState(false)
+  const [slackChannels, setSlackChannels] = useState<SlackChannel[]>([])
+  const [selectedSlackChannels, setSelectedSlackChannels] = useState<string[]>([])
+  const [slackLoading, setSlackLoading] = useState(false)
+
   useEffect(() => {
     if (currentWorkspace) {
       fetchDocuments(currentWorkspace.id)
       checkDriveStatus()
+      checkSlackStatus()
     }
   }, [currentWorkspace, fetchDocuments, checkDriveStatus])
 
@@ -63,6 +79,94 @@ export default function Documents() {
       fetchDriveFiles()
     }
   }, [showUploadModal, driveConnected, fetchDriveFiles])
+
+  // Slack API functions
+  const checkSlackStatus = async () => {
+    try {
+      const response = await fetch('/api/slack/status', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      setSlackConfigured(data.configured)
+    } catch {
+      setSlackConfigured(false)
+    }
+  }
+
+  const fetchSlackChannels = async () => {
+    if (!slackConfigured) return
+    setSlackLoading(true)
+    try {
+      const response = await fetch('/api/slack/channels', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      setSlackChannels(data.channels || [])
+    } catch (error) {
+      console.error('Failed to fetch Slack channels:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch Slack channels',
+        variant: 'destructive',
+      })
+    } finally {
+      setSlackLoading(false)
+    }
+  }
+
+  const handleSlackImport = async () => {
+    if (!currentWorkspace || selectedSlackChannels.length === 0) return
+    setSlackLoading(true)
+
+    try {
+      for (const channelId of selectedSlackChannels) {
+        const channel = slackChannels.find((c) => c.id === channelId)
+        if (!channel) continue
+
+        const response = await fetch('/api/slack/import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            channelId,
+            channelName: channel.name,
+            workspaceId: currentWorkspace.id,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to import #${channel.name}`)
+        }
+      }
+
+      toast({
+        title: 'Slack import complete',
+        description: `Imported ${selectedSlackChannels.length} channel(s)`,
+      })
+
+      setSelectedSlackChannels([])
+      setShowUploadModal(false)
+      fetchDocuments(currentWorkspace.id)
+    } catch (error) {
+      toast({
+        title: 'Import failed',
+        description: error instanceof Error ? error.message : 'Failed to import channels',
+        variant: 'destructive',
+      })
+    } finally {
+      setSlackLoading(false)
+    }
+  }
+
+  const toggleSlackChannel = (channelId: string) => {
+    setSelectedSlackChannels((prev) =>
+      prev.includes(channelId)
+        ? prev.filter((id) => id !== channelId)
+        : [...prev, channelId]
+    )
+  }
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || !currentWorkspace) return
@@ -168,7 +272,7 @@ export default function Documents() {
     }
   }
 
-  const getTypeIcon = (type: string) => {
+  const getTypeIcon = (_type: string) => {
     return FileText
   }
 
@@ -291,6 +395,9 @@ export default function Documents() {
                           {doc.source === 'google_drive' && (
                             <Cloud className="h-3 w-3 text-muted-foreground" />
                           )}
+                          {doc.source === 'slack' && (
+                            <MessageSquare className="h-3 w-3 text-muted-foreground" />
+                          )}
                           <span className="text-xs text-muted-foreground uppercase">
                             {doc.type}
                           </span>
@@ -316,14 +423,18 @@ export default function Documents() {
           </DialogHeader>
 
           <Tabs defaultValue="upload" className="mt-4">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="upload">
                 <HardDrive className="mr-2 h-4 w-4" />
-                Upload Files
+                Upload
               </TabsTrigger>
               <TabsTrigger value="drive" disabled={!user?.hasDriveAccess}>
                 <Cloud className="mr-2 h-4 w-4" />
-                Google Drive
+                Drive
+              </TabsTrigger>
+              <TabsTrigger value="slack" onClick={() => slackConfigured && fetchSlackChannels()}>
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Slack
               </TabsTrigger>
             </TabsList>
 
@@ -431,6 +542,109 @@ export default function Documents() {
                       <Cloud className="mr-2 h-4 w-4" />
                     )}
                     Import {selectedDriveFiles.length} Files
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="slack" className="mt-4">
+              {!slackConfigured ? (
+                <div className="text-center py-8">
+                  <MessageSquare className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+                  <p className="font-medium mb-2">Connect Slack</p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Add SLACK_BOT_TOKEN to your server .env file to enable Slack integration
+                  </p>
+                  <div className="text-xs text-left bg-muted p-3 rounded-lg max-w-md mx-auto">
+                    <p className="font-medium mb-2">Setup steps:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                      <li>Create a Slack App at api.slack.com/apps</li>
+                      <li>Add Bot Token Scopes: channels:history, channels:read, users:read</li>
+                      <li>Install to your workspace</li>
+                      <li>Copy Bot Token to server/.env as SLACK_BOT_TOKEN</li>
+                    </ol>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      {selectedSlackChannels.length} channel(s) selected
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchSlackChannels}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Refresh
+                    </Button>
+                  </div>
+
+                  <div className="max-h-64 overflow-y-auto space-y-2">
+                    {slackLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                      </div>
+                    ) : slackChannels.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Hash className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>No channels found. Click Refresh to load.</p>
+                      </div>
+                    ) : (
+                      slackChannels.map((channel) => (
+                        <div
+                          key={channel.id}
+                          className={cn(
+                            'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all',
+                            selectedSlackChannels.includes(channel.id)
+                              ? 'border-primary bg-primary/5'
+                              : 'hover:bg-muted'
+                          )}
+                          onClick={() => toggleSlackChannel(channel.id)}
+                        >
+                          <div
+                            className={cn(
+                              'flex h-5 w-5 items-center justify-center rounded border',
+                              selectedSlackChannels.includes(channel.id)
+                                ? 'bg-primary border-primary'
+                                : 'border-muted-foreground'
+                            )}
+                          >
+                            {selectedSlackChannels.includes(channel.id) && (
+                              <Check className="h-3 w-3 text-white" />
+                            )}
+                          </div>
+                          <Hash className="h-4 w-4 text-muted-foreground" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{channel.name}</p>
+                            {channel.purpose && (
+                              <p className="text-xs text-muted-foreground truncate">
+                                {channel.purpose}
+                              </p>
+                            )}
+                          </div>
+                          {channel.memberCount && (
+                            <span className="text-xs text-muted-foreground">
+                              {channel.memberCount} members
+                            </span>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <Button
+                    className="w-full"
+                    disabled={selectedSlackChannels.length === 0 || slackLoading}
+                    onClick={handleSlackImport}
+                  >
+                    {slackLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                    )}
+                    Import {selectedSlackChannels.length} Channel(s)
                   </Button>
                 </div>
               )}

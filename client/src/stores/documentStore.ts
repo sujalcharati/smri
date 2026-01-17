@@ -5,7 +5,7 @@ interface Document {
   _id: string
   title: string
   type: string
-  source: 'upload' | 'google_drive'
+  source: 'upload' | 'google_drive' | 'slack'
   summary?: string
   tags: string[]
   processingStatus: 'pending' | 'processing' | 'completed' | 'failed'
