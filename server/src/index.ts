@@ -11,6 +11,7 @@ import chatRoutes from './routes/chat.js';
 import workflowRoutes from './routes/workflows.js';
 import knowledgeRoutes from './routes/knowledge.js';
 import driveRoutes from './routes/drive.js';
+import slackRoutes from './routes/slack.js';
 
 dotenv.config();
 
@@ -42,6 +43,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/workflows', workflowRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/drive', driveRoutes);
+app.use('/api/slack', slackRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

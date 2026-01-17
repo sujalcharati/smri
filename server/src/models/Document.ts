@@ -16,9 +16,9 @@ export interface IDocument extends MongoDocument {
   title: string;
   content: string;
   summary?: string;
-  type: 'pdf' | 'doc' | 'docx' | 'txt' | 'sheet' | 'slide' | 'gdoc' | 'gsheet' | 'gslide';
-  source: 'upload' | 'google_drive';
-  sourceId?: string; // Google Drive file ID
+  type: 'pdf' | 'doc' | 'docx' | 'txt' | 'sheet' | 'slide' | 'gdoc' | 'gsheet' | 'gslide' | 'slack';
+  source: 'upload' | 'google_drive' | 'slack';
+  sourceId?: string; // Google Drive file ID or Slack channel ID
   sourceUrl?: string;
   mimeType: string;
   size: number;
@@ -73,12 +73,12 @@ const documentSchema = new Schema<IDocument>(
     },
     type: {
       type: String,
-      enum: ['pdf', 'doc', 'docx', 'txt', 'sheet', 'slide', 'gdoc', 'gsheet', 'gslide'],
+      enum: ['pdf', 'doc', 'docx', 'txt', 'sheet', 'slide', 'gdoc', 'gsheet', 'gslide', 'slack'],
       required: true,
     },
     source: {
       type: String,
-      enum: ['upload', 'google_drive'],
+      enum: ['upload', 'google_drive', 'slack'],
       required: true,
     },
     sourceId: String,
