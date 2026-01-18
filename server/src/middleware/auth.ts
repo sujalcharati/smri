@@ -48,8 +48,7 @@ export const authenticate = async (
 };
 
 export const generateToken = (userId: string): string => {
-  const secret = process.env.JWT_SECRET || 'default-secret';
-  const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
+  const secret: jwt.Secret = process.env.JWT_SECRET || 'default-secret';
 
-  return jwt.sign({ userId }, secret, { expiresIn });
+  return jwt.sign({ userId }, secret, { expiresIn: '7d' } as jwt.SignOptions);
 };

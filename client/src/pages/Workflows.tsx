@@ -17,7 +17,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
   Dialog,
@@ -308,7 +308,7 @@ export default function Workflows() {
 
                   {/* Steps preview */}
                   <div className="flex items-center gap-1 mb-4">
-                    {workflow.steps?.slice(0, 4).map((step, i) => (
+                    {workflow.steps?.slice(0, 4).map((step) => (
                       <div
                         key={step.id}
                         className="flex h-6 w-6 items-center justify-center rounded bg-muted"
