@@ -9,11 +9,11 @@ export const createOAuth2Client = (): OAuth2Client => {
   );
 };
 
-export const getAuthUrl = (oauth2Client: OAuth2Client): string => {
+// Login only - no Drive access (no verification warning)
+export const getLoginAuthUrl = (oauth2Client: OAuth2Client): string => {
   const scopes = [
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
-    'https://www.googleapis.com/auth/drive.readonly',
   ];
 
   return oauth2Client.generateAuthUrl({
@@ -21,6 +21,29 @@ export const getAuthUrl = (oauth2Client: OAuth2Client): string => {
     scope: scopes,
     prompt: 'consent',
   });
+};
+
+// Drive connection - separate from login (will show verification warning)
+export const getDriveAuthUrl = (oauth2Client: OAuth2Client): string => {
+  const scopes = [
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/drive.readonly',
+  ];
+
+  // Use drive-specific redirect URI
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI?.replace('/callback', '/drive/callback');
+
+  return oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: scopes,
+    prompt: 'consent',
+    redirect_uri: redirectUri,
+  });
+};
+
+// Legacy - keep for backwards compatibility
+export const getAuthUrl = (oauth2Client: OAuth2Client): string => {
+  return getLoginAuthUrl(oauth2Client);
 };
 
 export const getDriveClient = (accessToken: string, refreshToken?: string): drive_v3.Drive => {
