@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { User } from '../models/User.js';
 import { Workspace } from '../models/Workspace.js';
 import { authenticate, generateToken, AuthRequest } from '../middleware/auth.js';
-import { createOAuth2Client, getAuthUrl } from '../services/googleDrive.js';
+import { createOAuth2Client, getLoginAuthUrl, getDriveAuthUrl } from '../services/googleDrive.js';
 import { google } from 'googleapis';
 
 const router = Router();
@@ -121,10 +121,17 @@ router.post('/login', async (req, res: Response) => {
   }
 });
 
-// Google OAuth - Get auth URL
+// Google OAuth - Get auth URL (login only, no Drive)
 router.get('/google', (_req, res: Response) => {
   const oauth2Client = createOAuth2Client();
-  const authUrl = getAuthUrl(oauth2Client);
+  const authUrl = getLoginAuthUrl(oauth2Client);
+  res.json({ authUrl });
+});
+
+// Google Drive - Get auth URL (separate Drive connection)
+router.get('/google/drive', authenticate, (_req: AuthRequest, res: Response) => {
+  const oauth2Client = createOAuth2Client();
+  const authUrl = getDriveAuthUrl(oauth2Client);
   res.json({ authUrl });
 });
 
@@ -205,6 +212,53 @@ router.get('/google/callback', async (req, res: Response) => {
   } catch (error) {
     console.error('Google OAuth error:', error);
     res.redirect(`${process.env.CLIENT_URL}/auth?error=oauth_failed`);
+  }
+});
+
+// Google Drive - Callback (for connecting Drive to existing account)
+router.get('/google/drive/callback', async (req, res: Response) => {
+  const { code, state } = req.query;
+
+  if (!code || typeof code !== 'string') {
+    res.redirect(`${process.env.CLIENT_URL}/app/documents?error=missing_code`);
+    return;
+  }
+
+  try {
+    const oauth2Client = createOAuth2Client();
+    const { tokens } = await oauth2Client.getToken(code);
+
+    // Get user ID from state parameter (passed during auth URL generation)
+    // For now, we'll use the Google user info to find the user
+    oauth2Client.setCredentials(tokens);
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const { data: googleUser } = await oauth2.userinfo.get();
+
+    if (!googleUser.email) {
+      res.redirect(`${process.env.CLIENT_URL}/app/documents?error=no_email`);
+      return;
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email: googleUser.email });
+
+    if (!user) {
+      res.redirect(`${process.env.CLIENT_URL}/app/documents?error=user_not_found`);
+      return;
+    }
+
+    // Update user with Drive tokens
+    user.googleId = googleUser.id || user.googleId;
+    user.googleAccessToken = tokens.access_token || undefined;
+    if (tokens.refresh_token) {
+      user.googleRefreshToken = tokens.refresh_token;
+    }
+    await user.save();
+
+    res.redirect(`${process.env.CLIENT_URL}/app/documents?drive=connected`);
+  } catch (error) {
+    console.error('Drive OAuth error:', error);
+    res.redirect(`${process.env.CLIENT_URL}/app/documents?error=drive_connect_failed`);
   }
 });
 
