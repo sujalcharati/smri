@@ -79,6 +79,36 @@ const getUserName = async (userId: string): Promise<string> => {
   }
 };
 
+// Parse Slack message text to replace user mentions with names
+const parseSlackText = async (text: string): Promise<string> => {
+  // Replace user mentions <@U123ABC> with actual names
+  const userMentionRegex = /<@([A-Z0-9]+)>/g;
+  const matches = text.match(userMentionRegex);
+
+  if (!matches) return text;
+
+  let parsed = text;
+  for (const match of matches) {
+    const userId = match.slice(2, -1); // Remove <@ and >
+    const userName = await getUserName(userId);
+    parsed = parsed.replace(match, `@${userName}`);
+  }
+
+  // Replace channel mentions <#C123ABC|channel-name> with #channel-name
+  parsed = parsed.replace(/<#[A-Z0-9]+\|([^>]+)>/g, '#$1');
+
+  // Replace URLs <http://example.com|example.com> with just the URL
+  parsed = parsed.replace(/<(https?:\/\/[^|>]+)\|[^>]+>/g, '$1');
+  parsed = parsed.replace(/<(https?:\/\/[^>]+)>/g, '$1');
+
+  // Replace special characters
+  parsed = parsed.replace(/&amp;/g, '&');
+  parsed = parsed.replace(/&lt;/g, '<');
+  parsed = parsed.replace(/&gt;/g, '>');
+
+  return parsed;
+};
+
 // Fetch messages from a channel
 export const getChannelMessages = async (
   channelId: string,
@@ -113,8 +143,11 @@ export const getChannelMessages = async (
     const userName = msg.user ? await getUserName(msg.user) : 'Unknown';
     const timestamp = msg.ts || '0';
 
+    // Parse the message text to replace mentions with names
+    const parsedText = await parseSlackText(msg.text);
+
     messages.push({
-      text: msg.text,
+      text: parsedText,
       user: msg.user || 'unknown',
       userName,
       timestamp,
