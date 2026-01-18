@@ -9,20 +9,24 @@ export default function AuthCallback() {
   const { setToken } = useAuthStore()
 
   useEffect(() => {
-    const token = searchParams.get('token')
-    const error = searchParams.get('error')
+    const handleAuth = async () => {
+      const token = searchParams.get('token')
+      const error = searchParams.get('error')
 
-    if (error) {
-      navigate('/auth?error=' + error)
-      return
+      if (error) {
+        navigate('/auth?error=' + error)
+        return
+      }
+
+      if (token) {
+        await setToken(token)
+        navigate('/app')
+      } else {
+        navigate('/auth')
+      }
     }
 
-    if (token) {
-      setToken(token)
-      navigate('/app')
-    } else {
-      navigate('/auth')
-    }
+    handleAuth()
   }, [navigate, searchParams, setToken])
 
   return (
