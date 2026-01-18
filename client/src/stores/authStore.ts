@@ -28,7 +28,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, name: string) => Promise<void>
   loginWithGoogle: () => Promise<void>
-  setToken: (token: string) => void
+  setToken: (token: string) => Promise<void>
   checkAuth: () => Promise<void>
   logout: () => void
   setCurrentWorkspace: (workspace: Workspace) => void
@@ -100,10 +100,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  setToken: (token) => {
+  setToken: async (token) => {
     localStorage.setItem('token', token)
-    set({ token })
-    get().checkAuth()
+    set({ token, isLoading: true })
+    await get().checkAuth()
   },
 
   checkAuth: async () => {
@@ -113,6 +113,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isLoading: false, isAuthenticated: false })
       return
     }
+
+    set({ isLoading: true })
 
     try {
       const { data } = await authApi.getMe()
