@@ -198,8 +198,13 @@ router.post('/:id/messages', authenticate, async (req: AuthRequest, res: Respons
       }
     }
 
-    // Convert chat history to Gemini format
-    const chatHistory = chat.messages.slice(-10).map((msg) => ({
+    // Convert chat history to Gemini format (exclude current message, ensure starts with user)
+    let historyMessages = chat.messages.slice(-10);
+    // Ensure history starts with a user message (Gemini requirement)
+    while (historyMessages.length > 0 && historyMessages[0].role !== 'user') {
+      historyMessages = historyMessages.slice(1);
+    }
+    const chatHistory = historyMessages.map((msg) => ({
       role: msg.role === 'user' ? 'user' as const : 'model' as const,
       parts: [{ text: msg.content }],
     }));
@@ -233,9 +238,22 @@ router.post('/:id/messages', authenticate, async (req: AuthRequest, res: Respons
       },
       chatTitle: chat.title,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Send message error:', error);
-    res.status(500).json({ error: 'Failed to send message' });
+
+    // Check if it's a rate limit error
+    const err = error as { status?: number; message?: string };
+    if (err.status === 429) {
+      res.status(503).json({
+        error: 'AI is currently busy. Please try again in a few seconds.',
+        retryAfter: 30
+      });
+      return;
+    }
+
+    res.status(500).json({
+      error: 'AI service is temporarily unavailable. Please try again later.'
+    });
   }
 });
 

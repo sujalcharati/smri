@@ -12,7 +12,7 @@ const router = Router();
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit for memory efficiency
   fileFilter: (_req, file, cb) => {
     const allowedMimes = [
       'application/pdf',
@@ -95,8 +95,11 @@ router.post(
       workspace.stats.lastActivity = new Date();
       await workspace.save();
 
-      // Process document asynchronously
-      processDocument(document._id.toString(), file.buffer, file.mimetype).catch(console.error);
+      // Process document asynchronously - copy buffer to allow original to be GC'd
+      const bufferCopy = Buffer.from(file.buffer);
+      setImmediate(() => {
+        processDocument(document._id.toString(), bufferCopy, file.mimetype).catch(console.error);
+      });
 
       // Emit socket event
       const io = req.app.get('io');
@@ -158,7 +161,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     const [documents, total] = await Promise.all([
       DocumentModel.find(query)
-        .select('title type source summary tags processingStatus createdAt updatedAt size')
+        .select('title type source sourceId summary tags processingStatus createdAt updatedAt size')
         .sort({ updatedAt: -1 })
         .skip(skip)
         .limit(limitNum),
