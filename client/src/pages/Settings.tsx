@@ -19,11 +19,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuthStore } from '@/stores/authStore'
 import { driveApi } from '@/lib/api'
-import { useToast } from '@/components/ui/use-toast'
 
 export default function Settings() {
   const { user, currentWorkspace } = useAuthStore()
-  const { toast } = useToast()
 
   const [driveConnected, setDriveConnected] = useState(false)
   const [isCheckingDrive, setIsCheckingDrive] = useState(false)
