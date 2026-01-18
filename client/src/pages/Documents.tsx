@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Upload,
@@ -55,6 +56,7 @@ export default function Documents() {
   } = useDocumentStore()
   const { toast } = useToast()
 
+  const [searchParams, setSearchParams] = useSearchParams()
   const [searchQuery, setSearchQuery] = useState('')
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [selectedDriveFiles, setSelectedDriveFiles] = useState<string[]>([])
@@ -74,6 +76,28 @@ export default function Documents() {
       checkSlackStatus()
     }
   }, [currentWorkspace, fetchDocuments, checkDriveStatus])
+
+  // Handle Drive connection callback
+  useEffect(() => {
+    const driveStatus = searchParams.get('drive')
+    const error = searchParams.get('error')
+
+    if (driveStatus === 'connected') {
+      toast({
+        title: 'Google Drive connected',
+        description: 'You can now import files from your Drive',
+      })
+      checkDriveStatus()
+      setSearchParams({})
+    } else if (error) {
+      toast({
+        title: 'Connection failed',
+        description: error === 'drive_connect_failed' ? 'Failed to connect Google Drive' : error,
+        variant: 'destructive',
+      })
+      setSearchParams({})
+    }
+  }, [searchParams, setSearchParams, toast, checkDriveStatus])
 
   useEffect(() => {
     if (showUploadModal && driveConnected) {
@@ -531,10 +555,27 @@ export default function Documents() {
                   <Cloud className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
                   <p className="font-medium mb-2">Connect Google Drive</p>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Sign in with Google to import files from Drive
+                    Connect your Google Drive to import files
                   </p>
-                  <Button onClick={() => window.location.href = '/api/auth/google'}>
-                    Connect Drive
+                  <Button onClick={async () => {
+                    try {
+                      const response = await fetch('/api/auth/google/drive', {
+                        headers: { Authorization: `Bearer ${token}` },
+                      })
+                      const data = await response.json()
+                      if (data.authUrl) {
+                        window.location.href = data.authUrl
+                      }
+                    } catch (error) {
+                      toast({
+                        title: 'Error',
+                        description: 'Failed to connect to Google Drive',
+                        variant: 'destructive',
+                      })
+                    }
+                  }}>
+                    <Cloud className="mr-2 h-4 w-4" />
+                    Connect Google Drive
                   </Button>
                 </div>
               ) : (
