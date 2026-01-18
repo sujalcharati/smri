@@ -161,7 +161,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     const [documents, total] = await Promise.all([
       DocumentModel.find(query)
-        .select('title type source summary tags processingStatus createdAt updatedAt size')
+        .select('title type source sourceId summary tags processingStatus createdAt updatedAt size')
         .sort({ updatedAt: -1 })
         .skip(skip)
         .limit(limitNum),
