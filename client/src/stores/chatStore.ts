@@ -50,6 +50,7 @@ interface ChatState {
   sendMessage: (content: string) => Promise<void>
   deleteChat: (chatId: string) => Promise<void>
   clearCurrentChat: () => void
+  clearError: () => void
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -159,5 +160,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   clearCurrentChat: () => {
     set({ currentChat: null })
+  },
+
+  clearError: () => {
+    set({ error: null })
   },
 }))
