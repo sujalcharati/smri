@@ -65,6 +65,7 @@ export default function Documents() {
   const [slackChannels, setSlackChannels] = useState<SlackChannel[]>([])
   const [selectedSlackChannels, setSelectedSlackChannels] = useState<string[]>([])
   const [slackLoading, setSlackLoading] = useState(false)
+  const [syncingDocId, setSyncingDocId] = useState<string | null>(null)
 
   useEffect(() => {
     if (currentWorkspace) {
@@ -166,6 +167,49 @@ export default function Documents() {
         ? prev.filter((id) => id !== channelId)
         : [...prev, channelId]
     )
+  }
+
+  // Sync a single Slack document
+  const handleSlackSync = async (docId: string, sourceId: string, title: string) => {
+    if (!currentWorkspace) return
+    setSyncingDocId(docId)
+
+    try {
+      // Extract channel name from title (format: "Slack: #channel-name")
+      const channelName = title.replace('Slack: #', '')
+
+      const response = await fetch('/api/slack/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          channelId: sourceId,
+          channelName,
+          workspaceId: currentWorkspace.id,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Sync failed')
+      }
+
+      toast({
+        title: 'Slack synced',
+        description: `#${channelName} has been updated with latest messages`,
+      })
+
+      fetchDocuments(currentWorkspace.id)
+    } catch (error) {
+      toast({
+        title: 'Sync failed',
+        description: error instanceof Error ? error.message : 'Failed to sync channel',
+        variant: 'destructive',
+      })
+    } finally {
+      setSyncingDocId(null)
+    }
   }
 
   const handleFileUpload = async (files: FileList | null) => {
@@ -364,7 +408,7 @@ export default function Documents() {
                           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                             <Icon className="h-5 w-5 text-primary" />
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
                             <div
                               className={cn(
                                 'w-2 h-2 rounded-full',
@@ -372,6 +416,25 @@ export default function Documents() {
                               )}
                               title={doc.processingStatus}
                             />
+                            {doc.source === 'slack' && doc.sourceId && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="opacity-0 group-hover:opacity-100 h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleSlackSync(doc._id, doc.sourceId!, doc.title)
+                                }}
+                                disabled={syncingDocId === doc._id}
+                                title="Sync latest messages"
+                              >
+                                {syncingDocId === doc._id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
