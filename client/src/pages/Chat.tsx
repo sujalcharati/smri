@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
+import { useToast } from '@/components/ui/use-toast'
 import { useChatStore } from '@/stores/chatStore'
 import { useAuthStore } from '@/stores/authStore'
 import { cn, formatRelativeTime } from '@/lib/utils'
@@ -28,13 +29,16 @@ export default function Chat() {
     currentChat,
     isLoading,
     isSending,
+    error,
     fetchChats,
     createChat,
     loadChat,
     sendMessage,
     deleteChat,
     clearCurrentChat,
+    clearError,
   } = useChatStore()
+  const { toast } = useToast()
 
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -56,6 +60,18 @@ export default function Chat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [currentChat?.messages])
+
+  // Show toast when error occurs
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: 'AI Unavailable',
+        description: error,
+        variant: 'destructive',
+      })
+      clearError()
+    }
+  }, [error, toast, clearError])
 
   const handleNewChat = async () => {
     if (!currentWorkspace) return
