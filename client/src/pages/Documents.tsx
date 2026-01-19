@@ -30,6 +30,7 @@ import { useDocumentStore } from '@/stores/documentStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useToast } from '@/components/ui/use-toast'
 import { cn, formatBytes, formatRelativeTime } from '@/lib/utils'
+import { API_BASE_URL } from '@/lib/api'
 
 interface SlackChannel {
   id: string
@@ -108,7 +109,7 @@ export default function Documents() {
   // Slack API functions
   const checkSlackStatus = async () => {
     try {
-      const response = await fetch('/api/slack/status', {
+      const response = await fetch(`${API_BASE_URL}/slack/status`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       const data = await response.json()
@@ -122,7 +123,7 @@ export default function Documents() {
     if (!slackConfigured) return
     setSlackLoading(true)
     try {
-      const response = await fetch('/api/slack/channels', {
+      const response = await fetch(`${API_BASE_URL}/slack/channels`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       const data = await response.json()
@@ -148,7 +149,7 @@ export default function Documents() {
         const channel = slackChannels.find((c) => c.id === channelId)
         if (!channel) continue
 
-        const response = await fetch('/api/slack/import', {
+        const response = await fetch(`${API_BASE_URL}/slack/import`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -202,7 +203,7 @@ export default function Documents() {
       // Extract channel name from title (format: "Slack: #channel-name")
       const channelName = title.replace('Slack: #', '')
 
-      const response = await fetch('/api/slack/import', {
+      const response = await fetch(`${API_BASE_URL}/slack/import`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -559,7 +560,7 @@ export default function Documents() {
                   </p>
                   <Button onClick={async () => {
                     try {
-                      const response = await fetch('/api/auth/google/drive', {
+                      const response = await fetch(`${API_BASE_URL}/auth/google/drive`, {
                         headers: { Authorization: `Bearer ${token}` },
                       })
                       const data = await response.json()
