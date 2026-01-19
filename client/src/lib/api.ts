@@ -1,7 +1,11 @@
 import axios from 'axios'
 
+export const API_BASE_URL = import.meta.env.PROD
+  ? 'https://server-production-4738.up.railway.app/api'
+  : '/api'
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },

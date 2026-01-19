@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuthStore } from '@/stores/authStore'
+import { API_BASE_URL } from '@/lib/api'
 import { driveApi } from '@/lib/api'
 
 export default function Settings() {
@@ -43,7 +44,7 @@ export default function Settings() {
   }
 
   const handleConnectDrive = () => {
-    window.location.href = '/api/auth/google'
+    window.location.href = `${API_BASE_URL}/auth/google`
   }
 
   return (
