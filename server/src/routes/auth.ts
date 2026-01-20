@@ -166,10 +166,14 @@ router.get('/google/callback', async (req, res: Response) => {
     let isNewUser = false;
 
     if (!user) {
-      // Create new user
+      // Create new user - ensure name is never empty
+      const userName = googleUser.name && googleUser.name.trim()
+        ? googleUser.name.trim()
+        : googleUser.email?.split('@')[0] || 'User';
+
       user = new User({
         email: googleUser.email,
-        name: googleUser.name || googleUser.email.split('@')[0],
+        name: userName,
         avatar: googleUser.picture,
         googleId: googleUser.id,
         googleAccessToken: tokens.access_token,
